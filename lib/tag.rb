@@ -1,4 +1,4 @@
-class M3Uzzi
+class M3Uzi
 
   class Tag
 

@@ -1,4 +1,4 @@
-M3Uzzi
+M3Uzi
 ======
 
 Read and write M3U files with (relative) ease.
@@ -8,7 +8,7 @@ Usage
 
 Read an M3U file:
 
-    M3Uzzi.read("/path/to/file.m3u8")
+    M3Uzi.read("/path/to/file.m3u8")
 
 Write an M3U file:
 

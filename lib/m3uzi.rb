@@ -2,7 +2,7 @@ $:<< File.dirname(__FILE__)
 require 'tag'
 require 'file'
 
-class M3Uzzi
+class M3Uzi
 
   # Unsupported: KEY PROGRAM-DATE-TIME STREAM-INF DISCONTINUITY
   VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE STREAM-INF ENDLIST VERSION}
@@ -72,7 +72,7 @@ class M3Uzzi
   #-------------------------------------
 
   def add_file(&block)
-    new_file = M3Uzzi::File.new
+    new_file = M3Uzi::File.new
     yield(new_file)
     @files << new_file
   end
@@ -87,7 +87,7 @@ class M3Uzzi
   #-------------------------------------
 
   def add_tag(&block)
-    new_tag = M3Uzzi::Tag.new
+    new_tag = M3Uzi::Tag.new
     yield(new_tag)
     @tags << new_tag
   end
