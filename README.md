@@ -8,11 +8,11 @@ Usage
 
 Read an M3U file:
 
-    M3Uzzi.read_file("/path/to/file.m3u8")
+    M3Uzzi.read("/path/to/file.m3u8")
 
 Write an M3U file:
 
-    m3u.write_file("/path/to/file.m3u8")
+    m3u.write("/path/to/file.m3u8")
 
 Get a list of filenames:
 

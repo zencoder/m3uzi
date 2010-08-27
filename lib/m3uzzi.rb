@@ -20,7 +20,7 @@ class M3Uzzi
   # Read/Write M3U8 Files
   #-------------------------------------
 
-  def self.read_file(path)
+  def self.read(path)
     m3u = self.new
     lines = ::File.readlines(path)
     lines.each_with_index do |line, i|
@@ -45,7 +45,7 @@ class M3Uzzi
     m3u
   end
 
-  def write_file(path)
+  def write(path)
     f = ::File.open(path, "w")
     f << "#EXTM3U\n"
     tags.each do |tag|
