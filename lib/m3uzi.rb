@@ -10,11 +10,12 @@ class M3Uzi
   VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE STREAM-INF ENDLIST VERSION}
 
   attr_accessor :files
-  attr_accessor :tags
+  attr_accessor :tags, :comments
 
   def initialize
     @files = []
     @tags = []
+    @comments = []
   end
 
 
@@ -50,21 +51,25 @@ class M3Uzi
   def write(path)
     f = ::File.open(path, "w")
     f << "#EXTM3U\n"
+    comments.each do |comment|
+      f << "##{comment}\n"
+    end
     tags.each do |tag|
       next if %w{M3U ENDLIST}.include?(tag.name.to_s.upcase)
-      f << "#EXT-X-#{tag.name.to_s.upcase}"
+      if VALID_TAGS.include?(tag.name.to_s.upcase)
+        f << "#EXT-X-#{tag.name.to_s.upcase}"
+      else
+        f << "##{tag.name.to_s.upcase}"
+      end
       tag.value && f << ":#{tag.value}"
       f << "\n"
-    end
-    if !self[:targetduration]
-      f << "#EXT-X-TARGETDURATION:#{files.map(&:duration).sum}\n"
     end
     files.each do |file|
       f << "#EXTINF:#{file.duration}"
       file.description && f << ", #{file.description}"
       f << "\n#{file.path}\n"
     end
-    f << "#EXT-X-ENDLIST"
+    f << "#EXT-X-ENDLIST\n"
     f.close()
   end
 
@@ -105,6 +110,19 @@ class M3Uzi
       tag.name = key
       tag.value = value
     end
+  end
+
+
+  #-------------------------------------
+  # Comments
+  #-------------------------------------
+
+  def add_comment(comment)
+    @comments << comment
+  end
+
+  def <<(comment)
+    add_comment(comment)
   end
 
 
