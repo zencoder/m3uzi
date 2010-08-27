@@ -1,6 +1,8 @@
 $:<< File.dirname(__FILE__)
-require 'tag'
-require 'file'
+require 'm3uzi/tag'
+require 'm3uzi/file'
+require 'm3uzi/stream'
+require 'm3uzi/version'
 
 class M3Uzi
 
