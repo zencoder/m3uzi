@@ -100,7 +100,7 @@ class M3Uzi
   end
 
   def [](key)
-    tag_name = key.to_s.upcase.sub("_", "-")
+    tag_name = key.to_s.upcase.gsub("_", "-")
     obj = tags.detect{|tag| tag.name == tag_name }
     obj && obj.value
   end

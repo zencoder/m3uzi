@@ -43,12 +43,17 @@ Set an individual tag value:
 
     m3u[:targetduration] = 100
 
-Add a tag to the M3U index:
+Add a tag to the M3U index (custom tags even):
 
     m3u.add_tag do |tag|
       tag.name = "VERSION"
       tag.value = "1"
     end
+
+Add a comment:
+
+    m3u << "Comment"
+    m3u.add_comment("Comment")
 
 
 NOTES

@@ -6,7 +6,7 @@ class M3Uzi
     attr_accessor :value
 
     def name=(n)
-      @name = n.to_s.upcase.sub("_", "-")
+      @name = n.to_s.upcase.gsub("_", "-")
     end
 
   end
