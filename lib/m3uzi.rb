@@ -6,16 +6,18 @@ require 'm3uzi/version'
 
 class M3Uzi
 
-  # Unsupported: KEY PROGRAM-DATE-TIME STREAM-INF DISCONTINUITY
-  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE STREAM-INF ENDLIST VERSION}
+  # Unsupported: KEY PROGRAM-DATE-TIME DISCONTINUITY
+  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST VERSION}
 
   attr_accessor :files
   attr_accessor :tags, :comments
+  attr_accessor :final_media_file
 
   def initialize
     @files = []
     @tags = []
     @comments = []
+    @final_media_file = true
   end
 
 
@@ -41,6 +43,20 @@ class M3Uzi
           file.duration = duration
           file.description = description
         end
+        m3u.final_media_file = false
+      when :stream
+        attributes = parse_stream_tag(line)
+        m3u.add_stream do |stream|
+          stream.path = lines[i+1].strip
+          attributes.each_pair do |k,v|
+            k = k.to_s.downcase.sub('-','_')
+            next unless [:bandwidth, :program_id, :codecs, :resolution].include?(k)
+            v = $1 if v.to_s =~ /^"(.*)"$/
+            stream.send("#{k}=", v)
+          end
+        end
+      when :final
+        m3u.final_media_file = true
       else
         next
       end
@@ -65,11 +81,14 @@ class M3Uzi
       f << "\n"
     end
     files.each do |file|
-      f << "#EXTINF:#{file.duration}"
-      file.description && f << ", #{file.description}"
+      f << "#EXTINF:#{file.attribute_string}"
       f << "\n#{file.path}\n"
     end
-    f << "#EXT-X-ENDLIST\n"
+    streams.each do |stream|
+      f << "#EXT-X-STREAM-INF:#{stream.attribute_string}"
+      f << "\n#{stream.path}\n"
+    end
+    f << "#EXT-X-ENDLIST\n" if files.length > 0 && final_media_file
     f.close()
   end
 
@@ -86,6 +105,21 @@ class M3Uzi
 
   def filenames
     files.map{|file| file.path }
+  end
+
+
+  #-------------------------------------
+  # Streams
+  #-------------------------------------
+
+  def add_stream(&block)
+    new_stream = M3Uzi::Stream.new
+    yield(new_stream)
+    @streams << new_stream
+  end
+
+  def stream_names
+    streams.map{|stream| stream.path }
   end
 
 
@@ -136,6 +170,10 @@ protected
       :comment
     when /^#EXTINF/
       :info
+    when /^#EXT(-X)?-STREAM-INF/
+      :stream
+    when /^#EXT(-X)?-ENDLIST/
+      :final
     when /^#EXT(?!INF)/
       :tag
     else
@@ -153,8 +191,7 @@ protected
 
   def self.parse_stream_tag(line)
     match = line.match(/^#EXT-X-STREAM-INF:(.*)$/)[1]
-    attributes = match.split(/\s*,\s*/)
-    attributes.map{|a| a.split(/\s*=\s*/) }
+    match.scan(/([A-Z-]+)\s*=\s*("[^"]*"|[^,]*)/) # return attributes as array of arrays
   end
 
 end
