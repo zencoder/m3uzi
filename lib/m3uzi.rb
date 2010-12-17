@@ -9,12 +9,13 @@ class M3Uzi
   # Unsupported: KEY PROGRAM-DATE-TIME DISCONTINUITY
   VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST VERSION}
 
-  attr_accessor :files
+  attr_accessor :files, :streams
   attr_accessor :tags, :comments
   attr_accessor :final_media_file
 
   def initialize
     @files = []
+    @streams = []
     @tags = []
     @comments = []
     @final_media_file = true
