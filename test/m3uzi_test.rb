@@ -1,5 +1,5 @@
 require 'rubygems'
-require 'm3uzzi'
+require 'm3uzi'
 require 'test/unit'
 require 'shoulda'
 

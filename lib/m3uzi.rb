@@ -6,8 +6,8 @@ require 'm3uzi/version'
 
 class M3Uzi
 
-  # Unsupported: KEY PROGRAM-DATE-TIME DISCONTINUITY
-  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST VERSION}
+  # Unsupported: PROGRAM-DATE-TIME DISCONTINUITY
+  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST VERSION KEY}
 
   attr_accessor :files, :streams
   attr_accessor :tags, :comments
