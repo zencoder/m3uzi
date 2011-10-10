@@ -70,7 +70,7 @@ class M3Uzi
   def write_to_io(io_stream)
     check_version_restrictions
     io_stream << "#EXTM3U\n"
-    io_stream << "#EXT-X-VERSION:#{@version.to_i}" if @version > 1
+    io_stream << "#EXT-X-VERSION:#{@version.to_i}\n" if @version > 1
     comments.each do |comment|
       io_stream << "##{comment}\n"
     end
