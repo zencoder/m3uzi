@@ -6,7 +6,7 @@ require 'shoulda'
 
 class M3UziTest < Test::Unit::TestCase
 
-  context "whatever" do
+  context "basic checks" do
     should "instantiate an M3Uzi object" do
       m3u = M3Uzi.new
       assert_equal M3Uzi, m3u.class
