@@ -7,11 +7,12 @@ require 'm3uzi/version'
 class M3Uzi
 
   # Unsupported: PROGRAM-DATE-TIME DISCONTINUITY
-  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST VERSION KEY}
+  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST KEY}
 
   attr_accessor :files, :streams
   attr_accessor :tags, :comments
   attr_accessor :final_media_file
+  attr_accessor :version
 
   def initialize
     @files = []
@@ -19,6 +20,7 @@ class M3Uzi
     @tags = []
     @comments = []
     @final_media_file = true
+    @version = 1
   end
 
 
@@ -65,31 +67,38 @@ class M3Uzi
     m3u
   end
 
-  def write(path)
-    f = ::File.open(path, "w")
-    f << "#EXTM3U\n"
+  def write_to_io(io_stream)
+    check_version_restrictions
+    io_stream << "#EXTM3U\n"
+    io_stream << "#EXT-X-VERSION:#{@version.to_i}" if @version > 1
     comments.each do |comment|
-      f << "##{comment}\n"
+      io_stream << "##{comment}\n"
     end
     tags.each do |tag|
       next if %w{M3U ENDLIST}.include?(tag.name.to_s.upcase)
       if VALID_TAGS.include?(tag.name.to_s.upcase)
-        f << "#EXT-X-#{tag.name.to_s.upcase}"
+        io_stream << "#EXT-X-#{tag.name.to_s.upcase}"
       else
-        f << "##{tag.name.to_s.upcase}"
+        io_stream << "##{tag.name.to_s.upcase}"
       end
-      tag.value && f << ":#{tag.value}"
-      f << "\n"
+      tag.value && io_stream << ":#{tag.value}"
+      io_stream << "\n"
     end
     files.each do |file|
-      f << "#EXTINF:#{file.attribute_string}"
-      f << "\n#{file.path}\n"
+      io_stream << "#EXTINF:#{file.attribute_string}"
+      io_stream << "\n#{file.path}\n"
     end
     streams.each do |stream|
-      f << "#EXT-X-STREAM-INF:#{stream.attribute_string}"
-      f << "\n#{stream.path}\n"
+      io_stream << "#EXT-X-STREAM-INF:#{stream.attribute_string}"
+      io_stream << "\n#{stream.path}\n"
     end
-    f << "#EXT-X-ENDLIST\n" if files.length > 0 && final_media_file
+    io_stream << "#EXT-X-ENDLIST\n" if files.length > 0 && final_media_file
+  end
+
+  def write(path)
+    check_version_restrictions
+    f = ::File.open(path, "w")
+    write_to_io(f)
     f.close()
   end
 
@@ -105,7 +114,7 @@ class M3Uzi
   end
 
   def filenames
-    files.map{|file| file.path }
+    files.map { |file| file.path }
   end
 
 
@@ -120,7 +129,7 @@ class M3Uzi
   end
 
   def stream_names
-    streams.map{|stream| stream.path }
+    streams.map { |stream| stream.path }
   end
 
 
@@ -136,7 +145,7 @@ class M3Uzi
 
   def [](key)
     tag_name = key.to_s.upcase.gsub("_", "-")
-    obj = tags.detect{|tag| tag.name == tag_name }
+    obj = tags.detect { |tag| tag.name == tag_name }
     obj && obj.value
   end
 
@@ -160,6 +169,33 @@ class M3Uzi
     add_comment(comment)
   end
 
+  def check_version_restrictions
+    @version = 1
+
+    # Version 2 Features
+    if @tags.detect { |tag| tag.name == 'KEY' && tag.value.to_s =~ /,IV=/ }
+      @version = 2 if @version < 2
+    end
+
+    # Version 3 Features
+    if @files.detect { |file| file.duration.kind_of?(Float) }
+      @version = 3 if @version < 3
+    end
+
+    # Version 4 Features
+    if @files.detect { |file| file.byterange }
+      @version = 4 if @version < 4
+    end
+    if @tags.detect { |tag| ['MEDIA','I-FRAMES-ONLY'].include?(tag.name) }
+      @version = 4 if @version < 4
+    end
+
+    # NOTES
+    #   EXT-X-I-FRAME-STREAM-INF is supposed to be ignored by older clients.
+    #   AUDIO/VIDEO attributes of X-STREAM-INF are used in conjunction with MEDIA, so it should trigger v4.
+
+    @version
+  end
 
 protected
 
