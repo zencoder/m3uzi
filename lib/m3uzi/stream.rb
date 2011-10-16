@@ -1,6 +1,5 @@
 class M3Uzi
-
-  class Stream
+  class Stream < Item
 
     attr_accessor :path, :bandwidth, :program_id, :codecs, :resolution
 
@@ -11,6 +10,10 @@ class M3Uzi
       s << "CODECS=\"#{codecs}\"" if codecs
       s << "RESOLUTION=#{resolution}" if resolution
       s.join(',')
+    end
+
+    def format
+      "#EXT-X-STREAM-INF:#{attribute_string}\n#{path}"
     end
   end
 

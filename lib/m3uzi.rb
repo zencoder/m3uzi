@@ -2,23 +2,24 @@ $:<< File.dirname(__FILE__)
 require 'm3uzi/tag'
 require 'm3uzi/file'
 require 'm3uzi/stream'
+require 'm3uzi/comment'
 require 'm3uzi/version'
 
 class M3Uzi
 
-  # Unsupported: PROGRAM-DATE-TIME DISCONTINUITY
-  VALID_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE ENDLIST KEY}
+  # Tags not supported for writing: PROGRAM-DATE-TIME DISCONTINUITY ENDLIST
 
-  attr_accessor :files, :streams
-  attr_accessor :tags, :comments
+  # Header tags are only supported once per file.  Specifying it multiple times
+  # will override previous values.
+  HEADER_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE}
+
+  attr_accessor :header_tags, :playlist_items
   attr_accessor :final_media_file
   attr_accessor :version
 
   def initialize
-    @files = []
-    @streams = []
-    @tags = []
-    @comments = []
+    @header_tags = {}
+    @playlist_items = []
     @final_media_file = true
     @version = 1
   end
@@ -72,53 +73,45 @@ class M3Uzi
   # end
 
   def write_to_io(io_stream)
+    prev_encryption_key = nil
+    prev_encryption_iv = nil
+    
     check_version_restrictions
     io_stream << "#EXTM3U\n"
     io_stream << "#EXT-X-VERSION:#{@version.to_i}\n" if @version > 1
-    comments.each do |comment|
-      io_stream << "##{comment}\n"
+    
+    @header_tags.each do |item|
+      io_stream << (item.format + "\n") if item.valid?
     end
-    tags.each do |tag|
-      next if %w{M3U ENDLIST}.include?(tag.name.to_s.upcase)
-      if VALID_TAGS.include?(tag.name.to_s.upcase)
-        io_stream << "#EXT-X-#{tag.name.to_s.upcase}"
-      else
-        io_stream << "##{tag.name.to_s.upcase}"
-      end
-      tag.value && io_stream << ":#{tag.value}"
-      io_stream << "\n"
+    @playlist_items.each do |item|
+      io_stream << (item.format + "\n") if item.valid?
     end
-    files.each do |file|
-      io_stream << "#EXTINF:#{file.attribute_string}"
-      io_stream << "\n#{file.path}\n"
-    end
-    streams.each do |stream|
-      io_stream << "#EXT-X-STREAM-INF:#{stream.attribute_string}"
-      io_stream << "\n#{stream.path}\n"
-    end
-    io_stream << "#EXT-X-ENDLIST\n" if files.length > 0 && final_media_file
+
+    io_stream << "#EXT-X-ENDLIST\n" if items(File).length > 0 && @final_media_file
   end
 
   def write(path)
-    check_version_restrictions
-    f = ::File.open(path, "w")
-    write_to_io(f)
-    f.close()
+    ::File.open(path, "w") { |f| write_to_io(f) }
   end
 
+  def items(kind)
+    @playlist_items.select { |item| item.kind_of?(kind) }
+  end
 
   #-------------------------------------
   # Files
   #-------------------------------------
 
-  def add_file(&block)
+  def add_file(path = nil, duration = nil)
     new_file = M3Uzi::File.new
-    yield(new_file)
-    @files << new_file
+    new_file.path = path
+    new_file.duration = duration
+    yield(new_file) if block_given?
+    @playlist_items << new_file
   end
 
   def filenames
-    files.map { |file| file.path }
+    items(File).map { |file| file.path }
   end
 
 
@@ -126,14 +119,16 @@ class M3Uzi
   # Streams
   #-------------------------------------
 
-  def add_stream(&block)
+  def add_stream(path = nil, bandwidth = nil)
     new_stream = M3Uzi::Stream.new
-    yield(new_stream)
-    @streams << new_stream
+    new_stream.path = path
+    new_stream.bandwidth = bandwidth
+    yield(new_stream) if block_given?
+    @playlist_items << new_stream
   end
 
   def stream_names
-    streams.map { |stream| stream.path }
+    items(Stream).map { |stream| stream.path }
   end
 
 
@@ -141,56 +136,73 @@ class M3Uzi
   # Tags
   #-------------------------------------
 
-  def add_tag(&block)
+  def add_tag(name = nil, value = nil)
     new_tag = M3Uzi::Tag.new
-    yield(new_tag)
-    @tags << new_tag
-  end
-
-  def [](key)
-    tag_name = key.to_s.upcase.gsub("_", "-")
-    obj = tags.detect { |tag| tag.name == tag_name }
-    obj && obj.value
-  end
-
-  def []=(key, value)
-    add_tag do |tag|
-      tag.name = key
-      tag.value = value
+    new_tag.name = name
+    new_tag.value = value
+    yield(new_tag) if block_given?
+    if HEADER_TAGS.include?(new_tag.name.to_s.upcase)
+      @header_tags[new_tag.name.to_s.upcase] = new_tag
+    else
+      @playlist_items << new_tag
     end
   end
+
+  # def [](key)
+  #   tag_name = key.to_s.upcase.gsub("_", "-")
+  #   obj = tags.detect { |tag| tag.name == tag_name }
+  #   obj && obj.value
+  # end
+  # 
+  # def []=(key, value)
+  #   add_tag do |tag|
+  #     tag.name = key
+  #     tag.value = value
+  #   end
+  # end
 
 
   #-------------------------------------
   # Comments
   #-------------------------------------
 
-  def add_comment(comment)
-    @comments << comment
+  def add_comment(comment = nil)
+    new_comment = M3Uzi::Comment.new
+    new_commant.text = comment
+    yield(new_commant) if block_given?
+    @playlist_items << new_comment
   end
 
-  def <<(comment)
-    add_comment(comment)
-  end
+  # def <<(comment)
+  #   add_comment(comment)
+  # end
 
   def check_version_restrictions
     @version = 1
 
+    #
     # Version 2 Features
-    if @tags.detect { |tag| tag.name == 'KEY' && tag.value.to_s =~ /,IV=/ }
-      @version = 2 if @version < 2
+    #
+
+    # Check for custom IV
+    current_iv = 0
+    items(File).each do |item|
+      if item.encryption_iv && item.encryption_iv.to_s.downcas != format_iv(current_iv)
+        @version = 2 if @version < 2
+      end
+      current_iv += 1
     end
 
     # Version 3 Features
-    if @files.detect { |file| file.duration.kind_of?(Float) }
+    if items(File).detect { |item| item.duration.kind_of?(Float) }
       @version = 3 if @version < 3
     end
 
     # Version 4 Features
-    if @files.detect { |file| file.byterange }
+    if items(File).detect { |item| item.byterange }
       @version = 4 if @version < 4
     end
-    if @tags.detect { |tag| ['MEDIA','I-FRAMES-ONLY'].include?(tag.name) }
+    if items(Tag).detect { |item| ['MEDIA','I-FRAMES-ONLY'].include?(item.name) }
       @version = 4 if @version < 4
     end
 
@@ -235,4 +247,7 @@ protected
   #   match.scan(/([A-Z-]+)\s*=\s*("[^"]*"|[^,]*)/) # return attributes as array of arrays
   # end
 
+  def format_iv(num)
+    num.to_s(16).rjust(32,'0')
+  end
 end
