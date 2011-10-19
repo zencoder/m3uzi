@@ -12,18 +12,18 @@ class M3UziTest < Test::Unit::TestCase
       assert_equal M3Uzi, m3u.class
     end
 
-    should "read in an index file" do
-      m3u = M3Uzi.read(File.join(File.dirname(__FILE__), "fixtures/index.m3u8"))
-      assert_equal M3Uzi, m3u.class
-    end
+    # should "read in an index file" do
+    #   m3u = M3Uzi.read(File.join(File.dirname(__FILE__), "fixtures/index.m3u8"))
+    #   assert_equal M3Uzi, m3u.class
+    # end
   end
 
   context "with protocol versions" do
     should "set version 2 for encryption IV" do
       m3u = M3Uzi.new
-      m3u['KEY'] = "0x1234567890abcdef1234567890abcdef"
+      m3u.add_file('1.ts',10) { |f| f.encryption_key_url = "key.dat" }
       assert_equal 1, m3u.check_version_restrictions
-      m3u['KEY'] = "0x1234567890abcdef1234567890abcdef,IV=0x1234567890abcdef1234567890abcdef"
+      m3u.add_file('1.ts',10) { |f| f.encryption_key_url = "key.dat"; f.encryption_iv = "0x1234567890abcdef1234567890abcdef" }
       assert_equal 2, m3u.check_version_restrictions
 
       output_stream = StringIO.new
@@ -53,7 +53,7 @@ class M3UziTest < Test::Unit::TestCase
 
       output_stream = StringIO.new
       m3u.write_to_io(output_stream)
-      assert output_stream.string =~ /:10\.000,/
+      assert output_stream.string =~ /:10\.0000,/
       assert output_stream.string !~ /:10,/
     end
 

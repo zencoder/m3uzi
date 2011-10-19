@@ -1,4 +1,5 @@
 $:<< File.dirname(__FILE__)
+require 'm3uzi/item'
 require 'm3uzi/tag'
 require 'm3uzi/file'
 require 'm3uzi/stream'
@@ -6,12 +7,6 @@ require 'm3uzi/comment'
 require 'm3uzi/version'
 
 class M3Uzi
-
-  # Tags not supported for writing: PROGRAM-DATE-TIME DISCONTINUITY ENDLIST
-
-  # Header tags are only supported once per file.  Specifying it multiple times
-  # will override previous values.
-  HEADER_TAGS = %w{TARGETDURATION MEDIA-SEQUENCE ALLOW-CACHE}
 
   attr_accessor :header_tags, :playlist_items
   attr_accessor :final_media_file
@@ -73,18 +68,34 @@ class M3Uzi
   # end
 
   def write_to_io(io_stream)
-    prev_encryption_key = nil
-    prev_encryption_iv = nil
-    
+    reset_encryption_key_history
+    reset_byterange_history
+
     check_version_restrictions
     io_stream << "#EXTM3U\n"
     io_stream << "#EXT-X-VERSION:#{@version.to_i}\n" if @version > 1
-    
+
+    if items(File).length > 0
+      max_duration = valid_items(File).map { |f| f.duration.to_f }.max || 10.0
+      io_stream << "#EXT-X-TARGETDURATION:#{max_duration.ceil}\n"
+    end
+
     @header_tags.each do |item|
       io_stream << (item.format + "\n") if item.valid?
     end
+
     @playlist_items.each do |item|
-      io_stream << (item.format + "\n") if item.valid?
+      next unless item.valid?
+
+      if item.kind_of?(File)
+        encryption_key_line = generate_encryption_key_line(item)
+        io_stream << (encryption_key_line + "\n") if encryption_key_line
+
+        byterange_line = generate_byterange_line(item)
+        io_stream << (byterange_line + "\n") if byterange_line
+      end
+
+      io_stream << (item.format + "\n")
     end
 
     io_stream << "#EXT-X-ENDLIST\n" if items(File).length > 0 && @final_media_file
@@ -97,6 +108,79 @@ class M3Uzi
   def items(kind)
     @playlist_items.select { |item| item.kind_of?(kind) }
   end
+
+  def valid_items(kind)
+    @playlist_items.select { |item| item.kind_of?(kind) && item.valid? }
+  end
+
+  #-------------------------------------
+  # Playlist generation helpers.
+  #-------------------------------------
+
+  def reset_encryption_key_history
+    @encryption_key_url = nil
+    @encryption_iv = nil
+    @encryption_sequence = 0
+  end
+
+  def generate_encryption_key_line(file)
+    generate_line = false
+
+    default_iv = @encryption_iv || format_iv(@encryption_sequence)
+
+    if (file.encryption_key_url != :unset) && (file.encryption_key_url != @encryption_key_url)
+      @encryption_key_url = file.encryption_key_url
+      generate_line = true
+    end
+
+    if @encryption_key_url && file.encryption_iv != @encryption_iv
+      @encryption_iv = file.encryption_iv
+      generate_line = true
+    end
+
+    @encryption_sequence += 1
+
+    if generate_line
+      if @encryption_key_url.nil?
+        "#EXT-X-KEY:METHOD=NONE"
+      else
+        attrs = ['METHOD=AES-128']
+        attrs << 'URI="' + @encryption_key_url.gsub('"','%22').gsub(/[\r\n]/,'').strip + '"'
+        attrs << "IV=#{@encryption_iv}" if @encryption_iv
+        '#EXT-X-KEY:' + attrs.join(',')
+      end
+    else
+      nil
+    end
+  end
+
+  def reset_byterange_history
+    @prev_byterange_endpoint = nil
+  end
+
+  def generate_byterange_line(file)
+    line = nil
+
+    if file.byterange
+      if file.byterange_offset && file.byterange_offset != @prev_byterange_endpoint
+        offset = file.byterange_offset
+      elsif @prev_byterange_endpoint.nil?
+        offset = 0
+      else
+        offset = nil
+      end
+
+      line = "#EXT-X-BYTERANGE:#{file.byterange_offset.to_i}"
+      line += "@#{offset}" if offset
+
+      @prev_byterange_endpoint = offset + file.byterange
+    else
+      @prev_byterange_endpoint = nil
+    end
+
+    line
+  end
+
 
   #-------------------------------------
   # Files
@@ -141,11 +225,7 @@ class M3Uzi
     new_tag.name = name
     new_tag.value = value
     yield(new_tag) if block_given?
-    if HEADER_TAGS.include?(new_tag.name.to_s.upcase)
-      @header_tags[new_tag.name.to_s.upcase] = new_tag
-    else
-      @playlist_items << new_tag
-    end
+    @header_tags[new_tag.name] = new_tag
   end
 
   # def [](key)
@@ -153,7 +233,7 @@ class M3Uzi
   #   obj = tags.detect { |tag| tag.name == tag_name }
   #   obj && obj.value
   # end
-  # 
+  #
   # def []=(key, value)
   #   add_tag do |tag|
   #     tag.name = key
@@ -186,23 +266,23 @@ class M3Uzi
 
     # Check for custom IV
     current_iv = 0
-    items(File).each do |item|
-      if item.encryption_iv && item.encryption_iv.to_s.downcas != format_iv(current_iv)
+    valid_items(File).each do |item|
+      if item.encryption_iv && item.encryption_iv.to_s.downcase != format_iv(current_iv)
         @version = 2 if @version < 2
       end
       current_iv += 1
     end
 
     # Version 3 Features
-    if items(File).detect { |item| item.duration.kind_of?(Float) }
+    if valid_items(File).detect { |item| item.duration.kind_of?(Float) }
       @version = 3 if @version < 3
     end
 
     # Version 4 Features
-    if items(File).detect { |item| item.byterange }
+    if valid_items(File).detect { |item| item.byterange }
       @version = 4 if @version < 4
     end
-    if items(Tag).detect { |item| ['MEDIA','I-FRAMES-ONLY'].include?(item.name) }
+    if valid_items(Tag).detect { |item| ['MEDIA','I-FRAMES-ONLY'].include?(item.name) }
       @version = 4 if @version < 4
     end
 
@@ -233,21 +313,25 @@ protected
   #     :file
   #   end
   # end
-  # 
+  #
   # def self.parse_general_tag(line)
   #   line.match(/^#EXT(?:-X-)?(?!STREAM-INF)([^:\n]+)(:([^\n]+))?$/).values_at(1, 3)
   # end
-  # 
+  #
   # def self.parse_file_tag(line)
   #   line.match(/^#EXTINF:[ \t]*(\d+),?[ \t]*(.*)$/).values_at(1, 2)
   # end
-  # 
+  #
   # def self.parse_stream_tag(line)
   #   match = line.match(/^#EXT-X-STREAM-INF:(.*)$/)[1]
   #   match.scan(/([A-Z-]+)\s*=\s*("[^"]*"|[^,]*)/) # return attributes as array of arrays
   # end
 
-  def format_iv(num)
+  def self.format_iv(num)
     num.to_s(16).rjust(32,'0')
+  end
+
+  def format_iv(num)
+    self.class.format_iv(num)
   end
 end

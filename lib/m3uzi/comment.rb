@@ -4,7 +4,7 @@ class M3Uzi
     attr_accessor :text
 
     def format
-      "# #{text}"
+      "##{text}"
     end
   end
 end
