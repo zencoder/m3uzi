@@ -5,7 +5,7 @@ class M3Uzi
 
     def attribute_string
       if duration.kind_of?(Float)
-        "#{sprintf('%0.3f',duration)},#{description}"
+        "#{sprintf('%0.4f',duration)},#{description}"
       else
         "#{duration},#{description}"
       end
