@@ -248,8 +248,8 @@ class M3Uzi
 
   def add_comment(comment = nil)
     new_comment = M3Uzi::Comment.new
-    new_commant.text = comment
-    yield(new_commant) if block_given?
+    new_comment.text = comment
+    yield(new_comment) if block_given?
     @playlist_items << new_comment
   end
 
@@ -265,12 +265,8 @@ class M3Uzi
     #
 
     # Check for custom IV
-    current_iv = 0
-    valid_items(File).each do |item|
-      if item.encryption_iv && item.encryption_iv.to_s.downcase != format_iv(current_iv)
-        @version = 2 if @version < 2
-      end
-      current_iv += 1
+    if valid_items(File).detect { |item| item.encryption_key_url && item.encryption_iv }
+      @version = 2 if @version < 2
     end
 
     # Version 3 Features
