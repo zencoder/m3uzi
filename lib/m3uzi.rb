@@ -188,8 +188,8 @@ class M3Uzi
 
   def add_file(path = nil, duration = nil)
     new_file = M3Uzi::File.new
-    new_file.path = path
-    new_file.duration = duration
+    new_file.path = path if path
+    new_file.duration = duration if duration
     yield(new_file) if block_given?
     @playlist_items << new_file
   end
