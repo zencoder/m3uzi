@@ -324,7 +324,7 @@ protected
   # end
 
   def self.format_iv(num)
-    num.to_s(16).rjust(32,'0')
+    '0x' + num.to_s(16).rjust(32,'0')
   end
 
   def format_iv(num)

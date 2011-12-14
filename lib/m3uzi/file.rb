@@ -30,7 +30,7 @@ class M3Uzi
 
       if value.kind_of?(String)
         raise "Invalid encryption_iv given" unless value.length <= 32 && value =~ /^[0-9a-f]+$/i
-        @encryption_iv = value.downcase.rjust(32,'0')
+        @encryption_iv = '0x' + value.downcase.rjust(32,'0')
       elsif value.nil?
         @encryption_iv = nil
       else
