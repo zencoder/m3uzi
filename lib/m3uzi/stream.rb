@@ -8,7 +8,7 @@ class M3Uzi
 
     def attribute_string
       s = []
-      s << "PROGRAM-ID=#{program_id.to_i || 1}"
+      s << "PROGRAM-ID=#{(program_id || 1).to_i}"
       s << "BANDWIDTH=#{bandwidth.to_i}"
       s << "CODECS=\"#{codecs}\"" if codecs
       s << "RESOLUTION=#{resolution}" if resolution
