@@ -78,8 +78,8 @@ class M3Uzi
     check_version_restrictions
     io_stream << "#EXTM3U\n"
     io_stream << "#EXT-X-VERSION:#{@version.to_i}\n" if @version > 1
-    io_stream << "#EXT-X-MEDIA-SEQUENCE:#{@initial_media_sequence+@removed_file_count}" if @playlist_type == :live
-    io_stream << "#EXT-X-PLAYLIST-TYPE:#{@playlist_type.to_s.upcase}" if [:event,:vod].include?(@playlist_type)
+    io_stream << "#EXT-X-MEDIA-SEQUENCE:#{@initial_media_sequence+@removed_file_count}\n" if @playlist_type == :live
+    io_stream << "#EXT-X-PLAYLIST-TYPE:#{@playlist_type.to_s.upcase}\n" if [:event,:vod].include?(@playlist_type)
 
     if items(File).length > 0
       max_duration = valid_items(File).map { |f| f.duration.to_f }.max || 10.0
