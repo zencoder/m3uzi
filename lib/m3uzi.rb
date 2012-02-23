@@ -9,14 +9,18 @@ require 'm3uzi/version'
 class M3Uzi
 
   attr_accessor :header_tags, :playlist_items
-  attr_accessor :final_media_file
-  attr_accessor :version
+  attr_accessor :playlist_type, :final_media_file
+  attr_accessor :version, :initial_media_sequence, :sliding_window_duration
 
   def initialize
     @header_tags = {}
     @playlist_items = []
     @final_media_file = true
     @version = 1
+    @initial_media_sequence = 0
+    @sliding_window_duration = nil
+    @removed_file_count = 0
+    @playlist_type = :live
   end
 
 
@@ -74,6 +78,8 @@ class M3Uzi
     check_version_restrictions
     io_stream << "#EXTM3U\n"
     io_stream << "#EXT-X-VERSION:#{@version.to_i}\n" if @version > 1
+    io_stream << "#EXT-X-MEDIA-SEQUENCE:#{@initial_media_sequence+@removed_file_count}" if @playlist_type == :live
+    io_stream << "#EXT-X-PLAYLIST-TYPE:#{@playlist_type.to_s.upcase}" if [:event,:vod].include?(@playlist_type)
 
     if items(File).length > 0
       max_duration = valid_items(File).map { |f| f.duration.to_f }.max || 10.0
@@ -98,7 +104,7 @@ class M3Uzi
       io_stream << (item.format + "\n")
     end
 
-    io_stream << "#EXT-X-ENDLIST\n" if items(File).length > 0 && @final_media_file
+    io_stream << "#EXT-X-ENDLIST\n" if items(File).length > 0 && (@final_media_file || @playlist_type == :vod)
   end
 
   def write(path)
@@ -192,6 +198,7 @@ class M3Uzi
     new_file.duration = duration if duration
     yield(new_file) if block_given?
     @playlist_items << new_file
+    cleanup_sliding_window
   end
 
   def filenames
@@ -322,6 +329,19 @@ protected
   #   match = line.match(/^#EXT-X-STREAM-INF:(.*)$/)[1]
   #   match.scan(/([A-Z-]+)\s*=\s*("[^"]*"|[^,]*)/) # return attributes as array of arrays
   # end
+
+  def cleanup_sliding_window
+    return unless @sliding_window_duration && @playlist_type == :live
+    while total_duration > @sliding_window_duration
+      first_file = @playlist_items.detect { |item| item.kind_of?(File) && item.valid? }
+      @playlist_items.delete(first_file)
+      @removed_file_count += 1
+    end
+  end
+
+  def total_duration
+    valid_items(File).inject(0.0) { |d,f| d + f.duration.to_f }
+  end
 
   def self.format_iv(num)
     '0x' + num.to_s(16).rjust(32,'0')
