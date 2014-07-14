@@ -32,44 +32,47 @@ class M3Uzi
   ## For now, reading m3u8 files is not keeping up to date with writing, so we're
   ## disabling it in this version.  (Possibly to be re-introduced in the future.)
   ##
-  # def self.read(path)
-  #   m3u = self.new
-  #   lines = ::File.readlines(path)
-  #   lines.each_with_index do |line, i|
-  #     case type(line)
-  #     when :tag
-  #       name, value = parse_general_tag(line)
-  #       m3u.add_tag do |tag|
-  #         tag.name = name
-  #         tag.value = value
-  #       end
-  #     when :info
-  #       duration, description = parse_file_tag(line)
-  #       m3u.add_file do |file|
-  #         file.path = lines[i+1].strip
-  #         file.duration = duration
-  #         file.description = description
-  #       end
-  #       m3u.final_media_file = false
-  #     when :stream
-  #       attributes = parse_stream_tag(line)
-  #       m3u.add_stream do |stream|
-  #         stream.path = lines[i+1].strip
-  #         attributes.each_pair do |k,v|
-  #           k = k.to_s.downcase.sub('-','_')
-  #           next unless [:bandwidth, :program_id, :codecs, :resolution].include?(k)
-  #           v = $1 if v.to_s =~ /^"(.*)"$/
-  #           stream.send("#{k}=", v)
-  #         end
-  #       end
-  #     when :final
-  #       m3u.final_media_file = true
-  #     else
-  #       next
-  #     end
-  #   end
-  #   m3u
-  # end
+  def self.read(path)
+    m3u = self.new
+
+    lines = ::File.readlines(path)
+
+    lines.each_with_index do |line, i|
+      case type(line)
+      when :tag
+        name, value = parse_general_tag(line)
+        m3u.add_tag do |tag|
+          tag.name = name
+          tag.value = value
+        end
+      when :info
+        duration, description = parse_file_tag(line)
+        m3u.add_file do |file|
+          file.path = lines[i+1].strip
+          file.duration = duration
+          file.description = description
+        end
+        m3u.final_media_file = false
+      when :stream
+        attributes = parse_stream_tag(line)
+        m3u.add_stream do |stream|
+          stream.path = lines[i+1].strip
+          attributes.each_pair do |k,v|
+            k = k.to_s.downcase.sub('-','_')
+            next unless [:bandwidth, :program_id, :codecs, :resolution].include?(k)
+            v = $1 if v.to_s =~ /^"(.*)"$/
+            stream.send("#{k}=", v)
+          end
+        end
+      when :final
+        m3u.final_media_file = true
+      else
+        next
+      end
+    end
+
+    m3u
+  end
 
   def write_to_io(io_stream)
     reset_encryption_key_history
