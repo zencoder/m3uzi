@@ -301,37 +301,37 @@ class M3Uzi
 
 protected
 
-  # def self.type(line)
-  #   case line
-  #   when /^\s*$/
-  #     :whitespace
-  #   when /^#(?!EXT)/
-  #     :comment
-  #   when /^#EXTINF/
-  #     :info
-  #   when /^#EXT(-X)?-STREAM-INF/
-  #     :stream
-  #   when /^#EXT(-X)?-ENDLIST/
-  #     :final
-  #   when /^#EXT(?!INF)/
-  #     :tag
-  #   else
-  #     :file
-  #   end
-  # end
-  #
-  # def self.parse_general_tag(line)
-  #   line.match(/^#EXT(?:-X-)?(?!STREAM-INF)([^:\n]+)(:([^\n]+))?$/).values_at(1, 3)
-  # end
-  #
-  # def self.parse_file_tag(line)
-  #   line.match(/^#EXTINF:[ \t]*(\d+),?[ \t]*(.*)$/).values_at(1, 2)
-  # end
-  #
-  # def self.parse_stream_tag(line)
-  #   match = line.match(/^#EXT-X-STREAM-INF:(.*)$/)[1]
-  #   match.scan(/([A-Z-]+)\s*=\s*("[^"]*"|[^,]*)/) # return attributes as array of arrays
-  # end
+  def self.type(line)
+    case line
+    when /^\s*$/
+      :whitespace
+    when /^#(?!EXT)/
+      :comment
+    when /^#EXTINF/
+      :info
+    when /^#EXT(-X)?-STREAM-INF/
+      :stream
+    when /^#EXT(-X)?-ENDLIST/
+      :final
+    when /^#EXT(?!INF)/
+      :tag
+    else
+      :file
+    end
+  end
+
+  def self.parse_general_tag(line)
+    line.match(/^#EXT(?:-X-)?(?!STREAM-INF)([^:\n]+)(:([^\n]+))?$/).values_at(1, 3)
+  end
+
+  def self.parse_file_tag(line)
+    line.match(/^#EXTINF:[ \t]*(\d+),?[ \t]*(.*)$/).values_at(1, 2)
+  end
+
+  def self.parse_stream_tag(line)
+    match = line.match(/^#EXT-X-STREAM-INF:(.*)$/)[1]
+    match.scan(/([A-Z-]+)\s*=\s*("[^"]*"|[^,]*)/) # return attributes as array of arrays
+  end
 
   def cleanup_sliding_window
     return unless @sliding_window_duration && @playlist_type == :live
