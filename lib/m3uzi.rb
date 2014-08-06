@@ -57,7 +57,7 @@ class M3Uzi
         attributes = parse_stream_tag(line)
         m3u.add_stream do |stream|
           stream.path = lines[i+1].strip
-          attributes.each_pair do |k,v|
+          attributes.to_h.each do |k,v|
             k = k.to_s.downcase.sub('-','_')
             next unless [:bandwidth, :program_id, :codecs, :resolution].include?(k)
             v = $1 if v.to_s =~ /^"(.*)"$/
